@@ -99,24 +99,18 @@ class WebpackExtension extends CompilerExtension
 			$builder->addDefinition($this->prefix('assetResolver.debug'))
 				->setClass(AssetNameResolver\DebuggerAwareAssetNameResolver::class, [$assetResolver]);
 		}
-
-		// latte macro
-		if ($config['macros']) {
-			try {
-				$builder->getDefinitionByType(ILatteFactory::class)
-					->addSetup('?->addProvider(?, ?)', ['@self', 'webpackAssetLocator', $assetLocator])
-					->addSetup('?->onCompile[] = function ($engine) { Oops\WebpackNetteAdapter\Latte\WebpackMacros::install($engine->getCompiler()); }', ['@self']);
-
-			} catch (MissingServiceException $e) {
-				// ignore
-			}
-		}
 	}
 
 
 	public function beforeCompile()
 	{
 		$builder = $this->getContainerBuilder();
+
+		if ($this->config['macros']) {
+			$builder->getDefinition('nette.latteFactory')
+				->addSetup('?->onCompile[] = function ($engine) { Oops\WebpackNetteAdapter\Latte\WebpackMacros::install($engine->getCompiler()); }', ['@self'])
+				->addSetup('addFilter', ['webpack', [$this->prefix('@assetLocator'), 'locateInPublicPath']]);
+		}
 
 		if ($this->config['debugger'] && interface_exists(Tracy\IBarPanel::class)) {
 			$builder->getDefinition($this->prefix('pathProvider'))
